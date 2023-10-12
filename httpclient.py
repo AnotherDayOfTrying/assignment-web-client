@@ -31,9 +31,20 @@ class HTTPResponse(object):
     def __init__(self, code=200, body=""):
         self.code = code
         self.body = body
+    
+    def __repr__(self) -> str:
+        return f"Code: {self.code}\r\nBody: {self.body}"
 
 class HTTPClient(object):
-    #def get_host_port(self,url):
+    def get_host_port(self,url):
+        PORT_BY_SCHEME = {
+        "http": 80,
+        "https": 443,
+        }
+        parsed_url = urllib.parse.urlparse(url)
+        port = parsed_url.port if parsed_url.port else PORT_BY_SCHEME[parsed_url.scheme] # get port by schema
+        path = '/' if len(parsed_url.path) == 0 else parsed_url.path # default path '/' if no path is provided
+        return parsed_url.hostname, port, path
 
     def connect(self, host, port):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -41,13 +52,22 @@ class HTTPClient(object):
         return None
 
     def get_code(self, data):
-        return None
+        status_line = data.split("\r\n")[0] # first line is status_line
+        return int(status_line.split(' ')[1])
 
     def get_headers(self,data):
-        return None
+        headers = {}
+        lines = data.split("\r\n")
+        lines.pop(0) # remove status line
+        for line in lines:
+            if len(line.strip()) == 0: # empty line indicates start of body
+                return headers
+            header = line.strip().split(':', 1)
+            headers[header[0].strip()] = header[1].strip()
+        raise SyntaxError # should never reach here
 
     def get_body(self, data):
-        return None
+        return re.search(f"\r\n\r\n(.*)", data, re.S).group(1) # body is after \r\n\r\n
     
     def sendall(self, data):
         self.socket.sendall(data.encode('utf-8'))
@@ -68,13 +88,34 @@ class HTTPClient(object):
         return buffer.decode('utf-8')
 
     def GET(self, url, args=None):
-        code = 500
-        body = ""
+        hostname, port, path = self.get_host_port(url)
+        self.connect(hostname, port)
+        self.sendall(f"GET {path} HTTP/1.1\r\nHost: {hostname}\r\nConnection: close\r\n\r\n")
+        response = self.recvall(self.socket)
+        self.close()
+        # parse response
+        code = self.get_code(response)
+        headers = self.get_headers(response)       
+        body = self.get_body(response)
+        
+        print("Headers:", headers)
+        
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
-        code = 500
-        body = ""
+        hostname, port, path = self.get_host_port(url)
+        payload = urllib.parse.urlencode(args) if args is not None else '' # encode args
+        self.connect(hostname, port)
+        self.sendall(f"POST {path} HTTP/1.1\r\nHost: {hostname}\r\nContent-Type: application/json\r\nContent-Length: {len(payload.encode('utf-8'))}\r\nConnection: close\r\n\r\n{payload}")
+        response = self.recvall(self.socket)
+        self.socket.close()
+        # parse response
+        code = self.get_code(response)
+        headers = self.get_headers(response)       
+        body = self.get_body(response)
+        
+        print("Headers:", headers)
+        
         return HTTPResponse(code, body)
 
     def command(self, url, command="GET", args=None):

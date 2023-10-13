@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # coding: utf-8
-# Copyright 2016 Abram Hindle, https://github.com/tywtyw2002, and https://github.com/treedust
+# Copyright 2023 Abram Hindle, https://github.com/tywtyw2002, and https://github.com/treedust, jjavier
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,26 +95,27 @@ class HTTPClient(object):
         self.close()
         # parse response
         code = self.get_code(response)
-        headers = self.get_headers(response)       
+        # headers = self.get_headers(response)
         body = self.get_body(response)
         
-        print("Headers:", headers)
+        # print("Headers:", headers)
         
         return HTTPResponse(code, body)
 
     def POST(self, url, args=None):
         hostname, port, path = self.get_host_port(url)
         payload = urllib.parse.urlencode(args) if args is not None else '' # encode args
+        print(payload)
         self.connect(hostname, port)
-        self.sendall(f"POST {path} HTTP/1.1\r\nHost: {hostname}\r\nContent-Type: application/json\r\nContent-Length: {len(payload.encode('utf-8'))}\r\nConnection: close\r\n\r\n{payload}")
+        self.sendall(f"POST {path} HTTP/1.1\r\nHost: {hostname}\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: {len(payload.encode('utf-8'))}\r\nConnection: close\r\n\r\n{payload}")
         response = self.recvall(self.socket)
         self.socket.close()
         # parse response
         code = self.get_code(response)
-        headers = self.get_headers(response)       
+        # headers = self.get_headers(response)
         body = self.get_body(response)
         
-        print("Headers:", headers)
+        # print("Headers:", headers)
         
         return HTTPResponse(code, body)
 
